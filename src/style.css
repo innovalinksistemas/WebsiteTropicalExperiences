@@ -1,0 +1,27 @@
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:wght@600;700&family=Space+Grotesk:wght@400;500;600&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply min-h-screen bg-ink text-white font-sans;
+    background-image: radial-gradient(circle at top left, #244c41 0%, transparent 45%),
+      radial-gradient(circle at bottom right, #1d2f35 0%, transparent 50%);
+  }
+
+  button {
+    @apply font-sans;
+  }
+
+  input {
+    @apply font-sans;
+  }
+}
+
+@layer components {
+  .glass-panel {
+    @apply border border-white/20 bg-white/10 backdrop-blur-lg;
+  }
+}
