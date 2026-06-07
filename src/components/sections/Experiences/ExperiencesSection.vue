@@ -1,36 +1,22 @@
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { onBeforeUnmount, onMounted, ref } from 'vue'
 import { gsap } from 'gsap'
 import { ScrollTrigger } from 'gsap/ScrollTrigger'
-import { categories, experiences } from '../../../data/home.js'
-
-// Imagen de fallback mientras no haya imagen individual en la data
-const FALLBACK_IMAGE = 'https://cdn.arenalcloud.com/arenal-a65b6eb9-29d7-4dec-9784-b1b37ff7dfce-tropical/a2bd7f983ad6549134c9479f40e44cc3.jpg'
+import { experiences } from '../../../data/home.js'
 
 gsap.registerPlugin(ScrollTrigger)
 
-// ── Filtros ────────────────────────────────────────────────
-// Perfiles de cliente para segmentar (high-ticket friendly)
-const profiles = [
-  { id: 'all',        label: 'Todos' },
-  { id: 'familiar',   label: '👨‍👩‍👧 Familiar' },
-  { id: 'aventurero', label: '🧗 Aventurero' },
-  { id: 'premium',    label: '⭐ Premium' },
-]
+const FALLBACK_IMAGE = 'https://cdn.arenalcloud.com/arenal-a65b6eb9-29d7-4dec-9784-b1b37ff7dfce-tropical/a2bd7f983ad6549134c9479f40e44cc3.jpg'
 
-const activeCategory = ref(categories[0].id)
-const activeProfile  = ref('all')
+// ── Toma los primeros 12 tours del array
+// El primero siempre es el destacado (card grande)
+const allTours    = experiences.slice(0, 12)
+const featured    = allTours[0]
+const restTours   = allTours.slice(1)   // los 11 restantes
 
-const filteredExperiences = computed(() =>
-  experiences.filter((exp) => {
-    const catOk  = exp.category === activeCategory.value
-    const profOk = activeProfile.value === 'all' || exp.profile === activeProfile.value
-    return catOk && profOk
-  })
-)
-
+// ── Utilidades ─────────────────────────────────────────────
 const formatUSD = (value) =>
-  new Intl.NumberFormat('es-ES', {
+  new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: 'USD',
     maximumFractionDigits: 0,
@@ -40,24 +26,24 @@ const diffColor = (level) => ({
   'Suave':    'text-emerald-400',
   'Moderado': 'text-sun-400',
   'Difícil':  'text-red-400',
-}[level] || 'text-moss-300')
+}[level] ?? 'text-moss-300')
 
 const profileLabel = (p) => ({
-  familiar:   '👨‍👩‍👧 Familiar',
-  aventurero: '🧗 Aventurero',
+  familiar:   '👨‍👩‍👧 Family',
+  aventurero: '🧗 Adventure',
   premium:    '⭐ Premium',
 }[p] ?? '')
 
-const bookingWidgetUrl = 'https://widget.ticando.net/KTBmJaxmHMbcSCTLUBeXgDuvNbsoVXGfpHTyhRlodNRvPkHjmlGTnCPBdIpyeveVDxUkPG/trayecto/1/1'
-
 // ── Drawer ─────────────────────────────────────────────────
-const drawerOpen   = ref(false)
-const selectedExp  = ref(null)
-const activeImg    = ref(0)
+const selectedExp       = ref(null)
+const drawerOpen        = ref(false)
+const activeImg         = ref(0)
 const bookingWidgetOpen = ref(false)
+const bookingWidgetUrl  = 'https://widget.ticando.net/KTBmJaxmHMbcSCTLUBeXgDuvNbsoVXGfpHTyhRlodNRvPkHjmlGTnCPBdIpyeveVDxUkPG/trayecto/1/1'
 
 const syncBodyScroll = () => {
-  document.body.style.overflow = (drawerOpen.value || bookingWidgetOpen.value) ? 'hidden' : ''
+  document.body.style.overflow =
+    drawerOpen.value || bookingWidgetOpen.value ? 'hidden' : ''
 }
 
 const openDrawer = (exp) => {
@@ -65,15 +51,18 @@ const openDrawer = (exp) => {
   activeImg.value   = 0
   drawerOpen.value  = true
   syncBodyScroll()
-  gsap.fromTo('.exp-drawer',
+  gsap.fromTo(
+    '.exp-drawer',
     { x: '100%' },
-    { x: '0%', duration: 0.42, ease: 'power3.out' }
+    { x: '0%', duration: 0.42, ease: 'power3.out' },
   )
 }
 
 const closeDrawer = () => {
   gsap.to('.exp-drawer', {
-    x: '100%', duration: 0.32, ease: 'power3.in',
+    x: '100%',
+    duration: 0.32,
+    ease: 'power3.in',
     onComplete: () => {
       drawerOpen.value = false
       syncBodyScroll()
@@ -93,206 +82,268 @@ const closeBookingWidget = () => {
 
 const onKeydown = (e) => {
   if (e.key !== 'Escape') return
-  if (bookingWidgetOpen.value) {
-    closeBookingWidget()
-    return
-  }
+  if (bookingWidgetOpen.value) { closeBookingWidget(); return }
   if (drawerOpen.value) closeDrawer()
 }
 
 // ── Scroll animations ──────────────────────────────────────
-const sectionRef = ref(null)
-const headerRef  = ref(null)
-const filtersRef = ref(null)
-const cardsRef   = ref([])
+const sectionRef  = ref(null)
+const headerRef   = ref(null)
+const featuredRef = ref(null)
+const cardsRef    = ref([])
+let gsapCtx       = null
+
 const setCardRef = (el) => { if (el) cardsRef.value.push(el) }
 
 onMounted(() => {
   window.addEventListener('keydown', onKeydown)
 
-  const ctx = gsap.context(() => {
+  gsapCtx = gsap.context(() => {
+    // Header
     gsap.from(headerRef.value, {
       opacity: 0, y: 32, duration: 0.7, ease: 'power3.out',
-      scrollTrigger: { trigger: headerRef.value, start: 'top 88%', toggleActions: 'play none none none' },
+      scrollTrigger: {
+        trigger: headerRef.value,
+        start: 'top 88%',
+        toggleActions: 'play none none none',
+      },
     })
-    gsap.from(filtersRef.value, {
-      opacity: 0, y: 20, duration: 0.6, ease: 'power3.out', delay: 0.08,
-      scrollTrigger: { trigger: filtersRef.value, start: 'top 88%', toggleActions: 'play none none none' },
+
+    // Card destacada
+    gsap.from(featuredRef.value, {
+      opacity: 0, y: 40, duration: 0.8, ease: 'power3.out',
+      scrollTrigger: {
+        trigger: featuredRef.value,
+        start: 'top 88%',
+        toggleActions: 'play none none none',
+      },
     })
+
+    // Cards resto — stagger
     if (cardsRef.value.length) {
       gsap.from(cardsRef.value, {
-        opacity: 0, y: 48, duration: 0.7, ease: 'power3.out', stagger: 0.12,
-        scrollTrigger: { trigger: cardsRef.value[0], start: 'top 88%', toggleActions: 'play none none none' },
+        opacity: 0, y: 48, duration: 0.7, ease: 'power3.out', stagger: 0.1,
+        scrollTrigger: {
+          trigger: cardsRef.value[0],
+          start: 'top 88%',
+          toggleActions: 'play none none none',
+        },
       })
     }
   }, sectionRef.value)
-
-  sectionRef.value._gsapCtx = ctx
 })
 
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', onKeydown)
-  sectionRef.value?._gsapCtx?.revert()
   document.body.style.overflow = ''
+  gsapCtx?.revert()
 })
 </script>
 
 <template>
-  <section id="experiencias" ref="sectionRef" class="flex flex-col gap-8">
+  <section
+    id="experiences"
+    ref="sectionRef"
+    class="mx-auto flex w-full max-w-6xl flex-col gap-10 px-6 pb-24 pt-24"
+  >
 
-    <!-- ── HEADER + FILTROS ───────────────────────────────── -->
-    <div ref="headerRef" class="flex flex-wrap items-start justify-between gap-4">
+    <!-- ── Header ─────────────────────────────────────────── -->
+    <div ref="headerRef" class="flex flex-wrap items-end justify-between gap-4">
       <div>
-        <p class="text-xs uppercase tracking-[0.3em] text-moss-300">Opciones vivas</p>
-        <h2 class="font-display text-3xl text-white">
-          Explora propuestas iniciales por estilo de viaje
+        <p class="text-xs uppercase tracking-[0.4em] text-sun-400">Our collection</p>
+        <h2 class="mt-2 font-display text-4xl text-white">
+          Curated Experiences
         </h2>
       </div>
-      <!-- Filtro categoría (tu lógica original) -->
-      <div class="flex flex-wrap gap-2">
-        <button
-          v-for="cat in categories"
-          :key="cat.id"
-          :class="[
-            'rounded-full border px-4 py-2 text-xs transition-all duration-200',
-            activeCategory === cat.id
-              ? 'border-transparent bg-moss-700 text-white'
-              : 'border-white/30 text-moss-100 hover:border-white/100',
-          ]"
-          @click="activeCategory = cat.id"
-        >{{ cat.label }}</button>
-      </div>
+      <p class="max-w-sm text-sm text-moss-300">
+        12 handpicked journeys across Costa Rica's most extraordinary landscapes.
+      </p>
     </div>
 
-    <!-- ── FILTRO PERFIL DE CLIENTE ───────────────────────── -->
-    <div ref="filtersRef" class="flex flex-wrap items-center gap-2">
-      <span class="mr-1 text-[10px] uppercase tracking-widest text-white/30">Perfil</span>
-      <button
-        v-for="prof in profiles"
-        :key="prof.id"
-        :class="[
-          'rounded-full border px-3.5 py-1.5 text-xs transition-all duration-200',
-          activeProfile === prof.id
-            ? 'border-sun-400/60 bg-sun-400/15 text-sun-400'
-            : 'border-white/15 text-white/50 hover:border-white/35 hover:text-white/80',
-        ]"
-        @click="activeProfile = prof.id"
-      >{{ prof.label }}</button>
-    </div>
+    <!-- ── Layout editorial ───────────────────────────────── -->
+    <div class="editorial-grid">
 
-    <!-- ── GRID DE CARDS ──────────────────────────────────── -->
-    <Transition name="fade-grid" mode="out-in">
-      <div
-        :key="activeCategory + activeProfile"
-        class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
+      <!-- ══ CARD DESTACADA (primer tour, ocupa 2 columnas y 2 filas) ══ -->
+      <article
+        ref="featuredRef"
+        class="featured-card group relative cursor-pointer overflow-hidden rounded-[24px]"
+        @click="openDrawer(featured)"
       >
-        <article
-          v-for="exp in filteredExperiences"
-          :key="exp.id"
-          :ref="setCardRef"
-          @click="openDrawer(exp)"
-          class="js-card group relative flex cursor-pointer flex-col gap-4 overflow-hidden rounded-2xl border border-white/10 bg-moss-900/80 p-5 shadow-soft transition-all duration-300 hover:-translate-y-1 hover:border-sun-400/30 hover:shadow-xl"
+        <!-- Imagen de fondo con zoom en hover -->
+        <img
+          :src="featured.image || FALLBACK_IMAGE"
+          :alt="featured.title"
+          class="featured-img absolute inset-0 h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-105"
+        />
+
+        <!-- Gradiente oscuro para legibilidad -->
+        <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+
+        <!-- Badge -->
+        <div
+          v-if="featured.badge"
+          class="absolute left-5 top-5 rounded-full bg-sun-500 px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-white"
         >
-          <!-- Badge premium / popular -->
-          <span
-            v-if="exp.badge"
-            class="absolute right-4 top-4 rounded-full bg-sun-400 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-moss-900"
-          >{{ exp.badge }}</span>
+          {{ featured.badge }}
+        </div>
 
-          <!-- Imagen del tour (usa exp.image o fallback del CDN) -->
-          <div class="overflow-hidden rounded-xl">
-            <img
-              :src="exp.image || FALLBACK_IMAGE"
-              :alt="exp.title"
-              class="h-40 w-full object-cover transition-transform duration-500 group-hover:scale-105"
-            />
-          </div>
-
-          <!-- Título + perfil -->
-          <div class="flex items-start justify-between gap-3">
-            <h3 class="text-lg font-semibold text-white leading-snug">{{ exp.title }}</h3>
-            <span
-              v-if="exp.profile"
-              class="shrink-0 rounded-full bg-white/5 px-2 py-0.5 text-[10px] text-white/50"
-            >{{ profileLabel(exp.profile) }}</span>
-          </div>
-
-          <p class="text-sm text-moss-300 leading-relaxed">{{ exp.description }}</p>
-
+        <!-- Contenido anclado abajo -->
+        <div class="absolute inset-x-0 bottom-0 flex flex-col gap-3 p-6">
           <!-- Meta pills -->
           <div class="flex flex-wrap gap-2">
-            <span class="meta-pill">⏱ {{ exp.duration }}</span>
-            <span :class="['meta-pill', diffColor(exp.level)]">{{ exp.level }}</span>
-            <span class="meta-pill font-semibold text-sun-400">{{ formatUSD(exp.price) }}</span>
+            <span class="meta-pill">⏱ {{ featured.duration }}</span>
+            <span :class="['meta-pill', diffColor(featured.level)]">
+              {{ featured.level }}
+            </span>
+            <span v-if="featured.profile" class="meta-pill">
+              {{ profileLabel(featured.profile) }}
+            </span>
           </div>
 
-          <!-- CTA row -->
-          <div class="mt-auto flex items-center justify-between pt-1">
-            <span class="text-xs text-white/30">Ver detalles →</span>
+          <div class="flex items-end justify-between gap-4">
+            <div>
+              <h3 class="font-display text-3xl leading-tight text-white">
+                {{ featured.title }}
+              </h3>
+              <p class="mt-1 line-clamp-2 text-sm text-white/70">
+                {{ featured.description }}
+              </p>
+            </div>
+            <!-- Precio + CTA -->
+            <div class="flex shrink-0 flex-col items-end gap-2">
+              <p class="text-2xl font-bold text-sun-400">{{ formatUSD(featured.price) }}</p>
+              <button
+                type="button"
+                @click.stop="openBookingWidget"
+                class="rounded-full bg-gradient-to-r from-sun-400 to-sun-500 px-5 py-2 text-xs font-bold uppercase tracking-widest text-ink transition hover:brightness-110 active:scale-[0.97]"
+              >
+                Book Now
+              </button>
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <!-- ══ CARDS RESTANTES (11 tours en grid de 3) ══ -->
+      <article
+        v-for="exp in restTours"
+        :key="exp.id"
+        :ref="setCardRef"
+        class="tour-card group relative flex cursor-pointer flex-col overflow-hidden rounded-[20px] border border-white/10 transition-all duration-300 hover:-translate-y-1"
+        @click="openDrawer(exp)"
+      >
+        <!-- Imagen -->
+        <div class="relative h-44 overflow-hidden">
+          <img
+            :src="exp.image || FALLBACK_IMAGE"
+            :alt="exp.title"
+            class="h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-105"
+          />
+          <div class="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
+
+          <!-- Badge -->
+          <span
+            v-if="exp.badge"
+            class="absolute right-3 top-3 rounded-full bg-sun-500 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-widest text-white"
+          >
+            {{ exp.badge }}
+          </span>
+        </div>
+
+        <!-- Body -->
+        <div class="flex flex-1 flex-col gap-3 p-5">
+          <div class="flex items-start justify-between gap-2">
+            <h3 class="font-display text-xl leading-tight text-white">{{ exp.title }}</h3>
+            <span class="shrink-0 text-base font-bold text-sun-400">
+              {{ formatUSD(exp.price) }}
+            </span>
+          </div>
+
+          <p class="line-clamp-2 flex-1 text-sm leading-relaxed text-moss-300">
+            {{ exp.description }}
+          </p>
+
+          <!-- Meta pills -->
+          <div class="flex flex-wrap gap-1.5">
+            <span class="meta-pill">⏱ {{ exp.duration }}</span>
+            <span :class="['meta-pill', diffColor(exp.level)]">{{ exp.level }}</span>
+          </div>
+
+          <!-- Footer -->
+          <div class="flex items-center justify-between border-t border-white/10 pt-3">
+            <span class="text-xs text-white/30 transition group-hover:text-white/60">
+              View details →
+            </span>
             <button
               type="button"
               @click.stop="openBookingWidget"
-              class="rounded-full border border-white/20 px-4 py-1.5 text-xs text-white transition-all duration-200 group-hover:border-sun-400 group-hover:bg-sun-400 group-hover:text-moss-900"
+              class="rounded-full border border-white/20 px-4 py-1.5 text-xs font-medium text-white/70 transition group-hover:border-sun-400 group-hover:bg-sun-400 group-hover:text-ink"
             >
-              Reservar
+              Book
             </button>
           </div>
-        </article>
-
-        <!-- Empty state -->
-        <div v-if="filteredExperiences.length === 0"
-          class="col-span-full py-14 text-center text-moss-300/50">
-          <p class="mb-2 text-3xl">🌿</p>
-          <p class="text-sm">No hay experiencias con esos filtros.</p>
         </div>
-      </div>
-    </Transition>
+
+        <!-- Glow borde superior en hover — crema de marca -->
+        <div class="card-border-glow" aria-hidden="true" />
+      </article>
+
+    </div>
   </section>
 
   <!-- ══════════════════════════════════════════════════════
        DRAWER LATERAL
   ═══════════════════════════════════════════════════════ -->
   <Teleport to="body">
-    <!-- Overlay -->
+
+    <!-- Overlay drawer -->
     <Transition name="fade-overlay">
       <div
         v-if="drawerOpen"
-        class="fixed inset-0 z-[200] bg-black/55 backdrop-blur-sm"
+        class="fixed inset-0 z-[200] bg-black/60 backdrop-blur-sm"
         @click="closeDrawer"
       />
     </Transition>
 
-    <!-- Panel -->
+    <!-- Panel drawer -->
     <div
       v-if="drawerOpen && selectedExp"
-      class="exp-drawer fixed bottom-0 right-0 top-0 z-[201] flex w-full flex-col overflow-y-auto bg-[#0c1a0f] shadow-2xl sm:w-[460px]"
+      class="exp-drawer fixed bottom-0 right-0 top-0 z-[201] flex w-full flex-col overflow-y-auto bg-moss-900 shadow-2xl sm:w-[460px]"
     >
       <!-- Header sticky -->
-      <div class="sticky top-0 z-10 flex items-center justify-between bg-[#0c1a0f]/95 px-5 py-4 backdrop-blur-md">
+      <div class="sticky top-0 z-10 flex items-center justify-between bg-moss-900/95 px-5 py-4 backdrop-blur-md">
         <span class="text-[10px] uppercase tracking-[0.3em] text-sun-400">
-          {{ selectedExp.category }}
+          {{ selectedExp.category ?? 'Experience' }}
         </span>
         <button
           @click="closeDrawer"
           class="flex h-8 w-8 items-center justify-center rounded-full border border-white/15 text-white/50 transition hover:border-white/40 hover:text-white"
-          aria-label="Cerrar"
+          aria-label="Close"
         >✕</button>
       </div>
 
       <!-- Galería -->
-      <div v-if="selectedExp.images?.length" class="relative h-52 shrink-0 overflow-hidden sm:h-60">
+      <div
+        v-if="selectedExp.images?.length"
+        class="relative h-52 shrink-0 overflow-hidden sm:h-60"
+      >
         <img
           :src="selectedExp.images[activeImg]"
           :alt="selectedExp.title"
           class="h-full w-full object-cover transition-opacity duration-300"
         />
-        <div v-if="selectedExp.images.length > 1"
-          class="absolute bottom-3 left-1/2 flex -translate-x-1/2 gap-1.5">
+        <div
+          v-if="selectedExp.images.length > 1"
+          class="absolute bottom-3 left-1/2 flex -translate-x-1/2 gap-1.5"
+        >
           <button
-            v-for="(_, i) in selectedExp.images" :key="i"
+            v-for="(_, i) in selectedExp.images"
+            :key="i"
             @click.stop="activeImg = i"
-            :class="['h-1.5 rounded-full transition-all duration-200',
-              i === activeImg ? 'w-6 bg-sun-400' : 'w-1.5 bg-white/35']"
+            :class="[
+              'h-1.5 rounded-full transition-all duration-200',
+              i === activeImg ? 'w-6 bg-sun-400' : 'w-1.5 bg-white/35',
+            ]"
           />
         </div>
       </div>
@@ -302,21 +353,27 @@ onBeforeUnmount(() => {
 
         <!-- Título + precio -->
         <div class="flex items-start justify-between gap-3">
-          <h2 class="font-display text-2xl leading-tight text-white">{{ selectedExp.title }}</h2>
+          <h2 class="font-display text-2xl leading-tight text-white">
+            {{ selectedExp.title }}
+          </h2>
           <div class="shrink-0 text-right">
             <p class="text-xl font-bold text-sun-400">{{ formatUSD(selectedExp.price) }}</p>
-            <p class="text-[10px] text-white/35">por persona</p>
+            <p class="text-[10px] text-white/35">per person</p>
           </div>
         </div>
 
         <!-- Badges -->
         <div class="flex flex-wrap gap-2">
-          <span v-if="selectedExp.profile"
-            class="rounded-full border border-sun-400/30 bg-sun-400/10 px-3 py-1 text-xs text-sun-400">
+          <span
+            v-if="selectedExp.profile"
+            class="rounded-full border border-sun-400/30 bg-sun-400/10 px-3 py-1 text-xs text-sun-400"
+          >
             {{ profileLabel(selectedExp.profile) }}
           </span>
-          <span v-if="selectedExp.badge"
-            class="rounded-full border border-white/15 bg-white/5 px-3 py-1 text-xs text-white/60">
+          <span
+            v-if="selectedExp.badge"
+            class="rounded-full border border-white/15 bg-white/5 px-3 py-1 text-xs text-white/60"
+          >
             {{ selectedExp.badge }}
           </span>
         </div>
@@ -324,32 +381,39 @@ onBeforeUnmount(() => {
         <!-- Descripción -->
         <p class="text-sm leading-relaxed text-moss-300">{{ selectedExp.description }}</p>
 
-        <!-- Detalles en grid -->
+        <!-- Detalles en grid 2x2 -->
         <div class="grid grid-cols-2 gap-3">
           <div class="detail-cell">
-            <span class="detail-label">⏱ Duración</span>
+            <span class="detail-label">⏱ Duration</span>
             <span class="detail-value">{{ selectedExp.duration }}</span>
           </div>
           <div class="detail-cell">
-            <span class="detail-label">📊 Nivel</span>
-            <span :class="['detail-value', diffColor(selectedExp.level)]">{{ selectedExp.level }}</span>
+            <span class="detail-label">📊 Level</span>
+            <span :class="['detail-value', diffColor(selectedExp.level)]">
+              {{ selectedExp.level }}
+            </span>
           </div>
           <div v-if="selectedExp.minAge" class="detail-cell">
-            <span class="detail-label">👤 Edades</span>
+            <span class="detail-label">👤 Ages</span>
             <span class="detail-value">{{ selectedExp.minAge }}</span>
           </div>
           <div v-if="selectedExp.departure" class="detail-cell">
-            <span class="detail-label">📍 Salida</span>
+            <span class="detail-label">📍 Departure</span>
             <span class="detail-value text-xs">{{ selectedExp.departure }}</span>
           </div>
         </div>
 
         <!-- Qué incluye -->
         <div v-if="selectedExp.includes?.length">
-          <p class="mb-3 text-[10px] uppercase tracking-[0.3em] text-white/30">Incluye</p>
+          <p class="mb-3 text-[10px] uppercase tracking-[0.3em] text-white/30">
+            What's included
+          </p>
           <ul class="flex flex-col gap-1.5">
-            <li v-for="item in selectedExp.includes" :key="item"
-              class="flex items-center gap-2 text-sm text-moss-300">
+            <li
+              v-for="item in selectedExp.includes"
+              :key="item"
+              class="flex items-center gap-2 text-sm text-moss-300"
+            >
               <span class="h-1 w-1 shrink-0 rounded-full bg-sun-400" />
               {{ item }}
             </li>
@@ -359,68 +423,164 @@ onBeforeUnmount(() => {
         <div class="flex-1" />
 
         <!-- CTA sticky -->
-        <div class="sticky bottom-0 bg-[#0c1a0f] pb-6 pt-3">
+        <div class="sticky bottom-0 bg-moss-900 pb-6 pt-3">
           <button
             type="button"
             @click="openBookingWidget"
-            class="w-full rounded-full bg-gradient-to-r from-sun-400 to-sun-500 py-3.5 text-sm font-bold tracking-wide text-moss-900 transition hover:brightness-110 active:scale-[0.98]"
+            class="w-full rounded-full bg-gradient-to-r from-sun-400 to-sun-500 py-3.5 text-sm font-bold tracking-wide text-ink transition hover:brightness-110 active:scale-[0.98]"
           >
-            Reservar — {{ formatUSD(selectedExp.price) }} por persona
+            Book Now — {{ formatUSD(selectedExp.price) }} per person
           </button>
           <p class="mt-2 text-center text-[10px] text-white/25">
-            Sin cargos ocultos · Confirmación inmediata
+            No hidden fees · Instant confirmation
           </p>
         </div>
 
       </div>
     </div>
 
-    <div
-      v-if="bookingWidgetOpen"
-      class="fixed inset-0 z-[220] bg-black/70 backdrop-blur-sm"
-      @click="closeBookingWidget"
-    />
-    <div
-      v-if="bookingWidgetOpen"
-      class="fixed inset-0 z-[221] flex items-center justify-center p-4 sm:p-6"
-    >
-      <div class="relative flex h-[88vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
-        <div class="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3">
-          <div class="min-w-0">
-            <h3 class="font-display text-xl text-slate-900">Reservar experiencia</h3>
-            <a
-              :href="bookingWidgetUrl"
-              target="_blank"
-              rel="noopener noreferrer"
-              class="text-xs text-slate-500 underline decoration-slate-300 underline-offset-2 transition hover:text-slate-700"
+    <!-- ── Booking Widget Modal ──────────────────────────── -->
+    <Transition name="fade-overlay">
+      <div
+        v-if="bookingWidgetOpen"
+        class="fixed inset-0 z-[220] bg-black/70 backdrop-blur-sm"
+        @click="closeBookingWidget"
+      />
+    </Transition>
+
+    <Transition name="slide-up">
+      <div
+        v-if="bookingWidgetOpen"
+        class="fixed inset-0 z-[221] flex items-center justify-center p-4 sm:p-6"
+      >
+        <div class="relative flex h-[88vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-moss-900 shadow-2xl ring-1 ring-white/10">
+          <div class="flex items-center justify-between gap-3 border-b border-white/10 px-6 py-4">
+            <div class="min-w-0">
+              <h3 class="font-display text-xl text-white">Book your experience</h3>
+              <a
+                :href="bookingWidgetUrl"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="text-xs text-moss-300/60 underline underline-offset-2 transition hover:text-moss-300"
+              >
+                Open in new tab if it doesn't load
+              </a>
+            </div>
+            <button
+              type="button"
+              @click="closeBookingWidget"
+              class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-white/20 text-white/60 transition hover:border-white/50 hover:text-white"
+              aria-label="Close booking widget"
             >
-              Abrir en nueva pestaña si no carga
-            </a>
+              ✕
+            </button>
           </div>
-          <button
-            type="button"
-            @click="closeBookingWidget"
-            class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-slate-300 text-slate-500 transition hover:border-slate-500 hover:text-slate-900"
-            aria-label="Cerrar widget de reserva"
-          >
-            ✕
-          </button>
+          <iframe
+            :src="bookingWidgetUrl"
+            title="Booking widget"
+            class="h-full w-full flex-1 bg-white"
+            loading="lazy"
+          />
         </div>
-        <iframe
-          :src="bookingWidgetUrl"
-          title="Widget de reserva"
-          class="h-full w-full flex-1"
-          loading="lazy"
-        />
       </div>
-    </div>
+    </Transition>
+
   </Teleport>
 </template>
 
 <style scoped>
-.meta-pill {
-  @apply rounded-full border border-white/10 bg-white/5 px-2.5 py-0.5 text-[11px] text-moss-300;
+/* ── Editorial grid ──────────────────────────────────────── */
+/*
+  Layout:
+  - Desktop: 3 columnas
+    · Card destacada: col 1-2, row 1-2 (ocupa el doble de espacio)
+    · Cards 2 y 3: col 3, rows 1 y 2
+    · Cards 4-12: grid normal de 3 columnas
+  - Mobile: 1 columna, destacada primero
+*/
+.editorial-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1.25rem;
 }
+
+/* Featured ocupa 2 cols y 2 rows */
+.featured-card {
+  grid-column: 1 / 3;
+  grid-row: 1 / 3;
+  min-height: 480px;
+}
+
+@media (max-width: 767px) {
+  .editorial-grid {
+    grid-template-columns: 1fr;
+  }
+  .featured-card {
+    grid-column: 1 / 2;
+    grid-row: auto;
+    min-height: 320px;
+  }
+}
+
+/* ── Featured card ───────────────────────────────────────── */
+.featured-card {
+  position: relative;
+  background: #0c1a0f;
+}
+
+.featured-img {
+  will-change: transform;
+}
+
+/* ── Tour card (resto) ───────────────────────────────────── */
+.tour-card {
+  background: linear-gradient(
+    145deg,
+    rgba(255, 255, 255, 0.04) 0%,
+    rgba(255, 255, 255, 0.02) 100%
+  );
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.tour-card:hover {
+  box-shadow:
+    0 16px 48px rgba(0, 0, 0, 0.35),
+    0 0 0 1px rgba(232, 194, 139, 0.2);
+  border-color: rgba(232, 194, 139, 0.2);
+}
+
+/* Glow borde superior crema en hover */
+.card-border-glow {
+  position: absolute;
+  top: 0;
+  left: 10%;
+  right: 10%;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(232, 194, 139, 0.65),
+    transparent
+  );
+  opacity: 0;
+  transition: opacity 0.35s ease;
+  pointer-events: none;
+}
+
+.tour-card:hover .card-border-glow {
+  opacity: 1;
+}
+
+/* ── Meta pill ───────────────────────────────────────────── */
+/* bg-white/8 no es valor estándar de Tailwind — se define como CSS puro */
+.meta-pill {
+  @apply rounded-full border border-white/10 px-2.5 py-0.5 text-[11px] text-moss-300;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* ── Drawer detail cells ─────────────────────────────────── */
 .detail-cell {
   @apply flex flex-col gap-1 rounded-xl border border-white/10 bg-white/5 px-4 py-3;
 }
@@ -431,15 +591,14 @@ onBeforeUnmount(() => {
   @apply text-sm font-medium text-white;
 }
 
-/* Grid transition al cambiar filtro */
-.fade-grid-enter-active,
-.fade-grid-leave-active { transition: opacity 0.18s, transform 0.18s; }
-.fade-grid-enter-from,
-.fade-grid-leave-to     { opacity: 0; transform: translateY(6px); }
-
-/* Overlay */
+/* ── Transitions ─────────────────────────────────────────── */
 .fade-overlay-enter-active,
-.fade-overlay-leave-active { transition: opacity 0.28s; }
+.fade-overlay-leave-active { transition: opacity 0.28s ease; }
 .fade-overlay-enter-from,
 .fade-overlay-leave-to     { opacity: 0; }
+
+.slide-up-enter-active,
+.slide-up-leave-active { transition: opacity 0.3s ease, transform 0.3s ease; }
+.slide-up-enter-from,
+.slide-up-leave-to     { opacity: 0; transform: translateY(16px); }
 </style>
